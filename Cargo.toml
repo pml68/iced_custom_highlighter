@@ -1,0 +1,20 @@
+[package]
+name = "iced_custom_highlighter"
+description = "A custom highlighter for `iced`'s TextEditor widget that uses your application Theme's colors"
+authors = ["pml68 <contact@pml68.dev>"]
+version = "0.1.0"
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/pml68/iced_custom_highlighter"
+categories = ["gui"]
+keywords = ["gui", "ui", "graphics", "interface", "widgets"]
+rust-version = "1.80"
+
+[dependencies]
+iced_core = "0.13.2"
+once_cell = "1.0"
+syntect = "5.1"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
+all-features = true
