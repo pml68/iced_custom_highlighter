@@ -1,9 +1,10 @@
 //! A custom syntax highlighter for iced.
 //!
 //! It uses the colors from your app's Theme, based on the current [`Scope`]
-use iced_core::font::Font;
-use iced_core::text::highlighter::{self, Format};
-use iced_core::Theme;
+use iced_widget::core::font::Font;
+use iced_widget::core::text::highlighter::{self, Format};
+use iced_widget::text_editor::Catalog;
+use iced_widget::Theme;
 
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
@@ -12,28 +13,37 @@ use std::str::FromStr;
 use syntect::highlighting;
 use syntect::parsing;
 
-static SYNTAXES: Lazy<parsing::SyntaxSet> = Lazy::new(parsing::SyntaxSet::load_defaults_nonewlines);
+static SYNTAXES: Lazy<parsing::SyntaxSet> =
+    Lazy::new(parsing::SyntaxSet::load_defaults_nonewlines);
 
 const LINES_PER_SNAPSHOT: usize = 50;
 
-type ScopeSelectorsResult =
-    core::result::Result<highlighting::ScopeSelectors, parsing::ParseScopeError>;
+type ScopeSelectorsResult = core::result::Result<
+    highlighting::ScopeSelectors,
+    parsing::ParseScopeError,
+>;
 
 /// A syntax highlighter.
 #[derive(Debug)]
-pub struct Highlighter {
+pub struct Highlighter<T = Theme>
+where
+    T: Catalog + 'static + Clone + PartialEq,
+{
     syntax: &'static parsing::SyntaxReference,
     custom_scopes: Vec<Scope>,
-    style: Option<fn(&Theme, Scope) -> Format<Font>>,
+    style: fn(&T, Scope) -> Format<Font>,
     caches: Vec<(parsing::ParseState, parsing::ScopeStack)>,
     current_line: usize,
 }
 
-impl highlighter::Highlighter for Highlighter {
-    type Settings = Settings;
-    type Highlight = Highlight;
+impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
+    for Highlighter<T>
+{
+    type Settings = Settings<T>;
+    type Highlight = Highlight<T>;
 
-    type Iterator<'a> = Box<dyn Iterator<Item = (Range<usize>, Self::Highlight)> + 'a>;
+    type Iterator<'a> =
+        Box<dyn Iterator<Item = (Range<usize>, Self::Highlight)> + 'a>;
 
     fn new(settings: &Self::Settings) -> Self {
         let syntax = SYNTAXES
@@ -79,32 +89,35 @@ impl highlighter::Highlighter for Highlighter {
             self.current_line = 0;
         }
 
-        let (parser, stack) = self.caches.last().cloned().unwrap_or_else(|| {
-            (
-                parsing::ParseState::new(self.syntax),
-                parsing::ScopeStack::new(),
-            )
-        });
+        let (parser, stack) =
+            self.caches.last().cloned().unwrap_or_else(|| {
+                (
+                    parsing::ParseState::new(self.syntax),
+                    parsing::ScopeStack::new(),
+                )
+            });
 
         self.caches.push((parser, stack));
     }
 
     fn highlight_line(&mut self, line: &str) -> Self::Iterator<'_> {
         if self.current_line / LINES_PER_SNAPSHOT >= self.caches.len() {
-            let (parser, stack) = self.caches.last().expect("Caches must not be empty");
+            let (parser, stack) =
+                self.caches.last().expect("Caches must not be empty");
 
             self.caches.push((parser.clone(), stack.clone()));
         }
 
         self.current_line += 1;
 
-        let (parser, stack) = self.caches.last_mut().expect("Caches must not be empty");
+        let (parser, stack) =
+            self.caches.last_mut().expect("Caches must not be empty");
 
         let ops = parser.parse_line(line, &SYNTAXES).unwrap_or_default();
 
-        let style = &self.style;
         let custom_scopes = &self.custom_scopes;
 
+        let style = &self.style;
         Box::new(
             ScopeRangeIterator {
                 ops,
@@ -121,7 +134,10 @@ impl highlighter::Highlighter for Highlighter {
                     Some((
                         range,
                         Highlight {
-                            scope: Scope::from_scopestack(stack.clone(), custom_scopes.clone()),
+                            scope: Scope::from_scopestack(
+                                stack.clone(),
+                                custom_scopes.clone(),
+                            ),
                             style: style.clone(),
                         },
                     ))
@@ -137,7 +153,10 @@ impl highlighter::Highlighter for Highlighter {
 
 /// The settings of a [`Highlighter`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct Settings {
+pub struct Settings<T>
+where
+    T: Catalog,
+{
     /// Custom scopes used for parsing the code.
     ///
     /// It extends [`Scope::ALL`].
@@ -146,10 +165,9 @@ pub struct Settings {
     /// The styling method of the [`Highlighter`].
     ///
     /// It dictates how text matching a certain scope will be highlighted.
-    /// If set to None, [`default_style`] will be used.
     ///
     /// [`default_style`]: Highlight::default_style
-    pub style: Option<fn(&Theme, Scope) -> Format<Font>>,
+    pub style: fn(&T, Scope) -> Format<Font>,
 
     /// The extension of the file or the name of the language to highlight.
     ///
@@ -157,11 +175,11 @@ pub struct Settings {
     pub token: String,
 }
 
-impl Settings {
+impl<T: Catalog> Settings<T> {
     /// Creates a new [`Settings`] struct with the given values.
     pub fn new(
         custom_scopes: Vec<Scope>,
-        style: Option<fn(&Theme, Scope) -> Format<Font>>,
+        style: fn(&T, Scope) -> Format<Font>,
         token: impl Into<String>,
     ) -> Self {
         Self {
@@ -174,39 +192,44 @@ impl Settings {
 
 /// A highlight produced by a [`Highlighter`].
 #[derive(Debug)]
-pub struct Highlight {
+pub struct Highlight<T>
+where
+    T: Catalog,
+{
     scope: Scope,
-    style: Option<fn(&Theme, Scope) -> Format<Font>>,
+    style: fn(&T, Scope) -> Format<Font>,
 }
 
-impl Highlight {
+impl<T: Catalog> Highlight<T> {
     /// Returns the [`Format`] of the [`Highlight`].
     ///
     /// It contains both the [`color`] and the [`font`].
     ///
-    /// [`color`]: iced_core::Color
-    /// [`font`]: iced_core::Font
-    pub fn to_format(&self, theme: &Theme) -> Format<Font> {
-        match self.style {
-            Some(style) => style(theme, self.scope.clone()),
-            None => Self::default_style(theme, self.scope.clone()),
-        }
+    /// [`color`]: iced_widget::core::Color
+    /// [`font`]: iced_widget::core::Font
+    pub fn to_format(&self, theme: &T) -> Format<Font> {
+        (self.style)(theme, self.scope.clone())
     }
+}
 
+impl Highlight<Theme> {
     /// The defalt styling function of a [`Highlight`].
     pub fn default_style(theme: &Theme, scope: Scope) -> Format<Font> {
         let color = match scope {
-            Scope::Comment | Scope::TagStart => theme.extended_palette().background.weak.color,
+            Scope::Comment | Scope::TagStart => {
+                theme.extended_palette().background.weak.color
+            }
             Scope::String | Scope::RegExp | Scope::QuotedString => {
                 theme.extended_palette().primary.base.color
             }
-            Scope::EscapeSequence | Scope::SupportConstruct | Scope::Continuation => {
-                theme.extended_palette().danger.base.color
-            }
+            Scope::EscapeSequence
+            | Scope::SupportConstruct
+            | Scope::Continuation => theme.extended_palette().danger.base.color,
             Scope::Number => theme.extended_palette().secondary.weak.color,
-            Scope::Variable | Scope::VariableStart | Scope::TagName | Scope::Brackets => {
-                theme.extended_palette().primary.weak.color
-            }
+            Scope::Variable
+            | Scope::VariableStart
+            | Scope::TagName
+            | Scope::Brackets => theme.extended_palette().primary.weak.color,
             Scope::VariableFunction | Scope::FunctionName => {
                 theme.extended_palette().success.base.color
             }
@@ -219,7 +242,9 @@ impl Highlight {
             | Scope::StorageType
             | Scope::Class
             | Scope::LibraryClass
-            | Scope::LibraryFunction => theme.extended_palette().success.base.color,
+            | Scope::LibraryFunction => {
+                theme.extended_palette().success.base.color
+            }
             Scope::QuotedSingle => theme.palette().text,
             Scope::BuiltinConstant | Scope::UserDefinedConstant => {
                 theme.extended_palette().danger.base.color
@@ -228,8 +253,12 @@ impl Highlight {
             Scope::Special => theme.extended_palette().danger.strong.color,
             Scope::Import => theme.extended_palette().primary.weak.color,
             Scope::Exception => theme.extended_palette().danger.base.color,
-            Scope::Parantheses | Scope::Braces => theme.extended_palette().background.strong.color,
-            Scope::Other | Scope::Custom { .. } => theme.extended_palette().primary.strong.color,
+            Scope::Parantheses | Scope::Braces => {
+                theme.extended_palette().background.strong.color
+            }
+            Scope::Other | Scope::Custom { .. } => {
+                theme.extended_palette().primary.strong.color
+            }
         };
 
         Format {
@@ -326,7 +355,10 @@ impl Scope {
     ];
 
     /// Creates a new custom [`Scope`].
-    pub fn custom(name: impl Into<String>, scope_string: impl Into<String>) -> Self {
+    pub fn custom(
+        name: impl Into<String>,
+        scope_string: impl Into<String>,
+    ) -> Self {
         Self::Custom {
             name: name.into(),
             scope_string: scope_string.into(),
@@ -375,11 +407,15 @@ impl Scope {
         }
     }
 
-    fn from_scopestack(stack: parsing::ScopeStack, custom_scopes: Vec<Self>) -> Self {
+    fn from_scopestack(
+        stack: parsing::ScopeStack,
+        custom_scopes: Vec<Self>,
+    ) -> Self {
         let scopes: Vec<Self>;
 
         if custom_scopes.len() > 0 {
-            let mut hashset: HashSet<Self> = (*Self::ALL).to_vec().into_iter().collect();
+            let mut hashset: HashSet<Self> =
+                (*Self::ALL).to_vec().into_iter().collect();
             hashset.extend(custom_scopes);
             scopes = hashset.into_iter().collect();
         } else {
@@ -413,7 +449,7 @@ impl Scope {
     }
 }
 
-impl From<Scope> for Result<highlighting::ScopeSelectors, parsing::ParseScopeError> {
+impl From<Scope> for ScopeSelectorsResult {
     fn from(value: Scope) -> Self {
         highlighting::ScopeSelectors::from_str(value.scope_str())
     }

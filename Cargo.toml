@@ -11,7 +11,7 @@ keywords = ["gui", "ui", "graphics", "interface", "widgets"]
 rust-version = "1.80"
 
 [dependencies]
-iced_core = "0.13.2"
+iced_widget = "0.13.4"
 once_cell = "1.0"
 syntect = "5.1"
 
