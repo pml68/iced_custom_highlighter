@@ -1,6 +1,57 @@
 //! A custom syntax highlighter for iced.
 //!
 //! It uses the colors from your app's Theme, based on the current [`Scope`]
+//!
+//! # Example
+//!
+//! ```no_run
+//! use iced::widget::{Column, pick_list, text_editor};
+//! use iced::{Element, Theme};
+//! use iced_custom_highlighter::{Highlight, Highlighter, Settings};
+//!
+//! #[derive(Default)]
+//! struct State {
+//!     content: text_editor::Content,
+//!     theme: Theme,
+//! }
+//!
+//! #[derive(Debug, Clone)]
+//! enum Message {
+//!     Edit(text_editor::Action),
+//!     ChangeTheme(Theme),
+//! }
+//!
+//! fn view(state: &State) -> Element<'_, Message> {
+//! Column::new()
+//!     .push(
+//!         text_editor(&state.content)
+//!             .placeholder("Type something here...")
+//!             .highlight_with::<Highlighter>(
+//!                 Settings::new(vec![], Highlight::default_style, state.theme.clone(), "rs"),
+//!                 Highlight::to_format,
+//!             )
+//!             .on_action(Message::Edit),
+//!     )
+//!     .push(pick_list(
+//!         Theme::ALL,
+//!         Some(state.theme.clone()),
+//!         Message::ChangeTheme,
+//!     ))
+//!     .into()
+//! }
+//!
+//! fn update(state: &mut State, message: Message) {
+//!     match message {
+//!         Message::Edit(action) => {
+//!             state.content.perform(action);
+//!         }
+//!
+//!         Message::ChangeTheme(theme) => {
+//!             state.theme = theme;
+//!         }
+//!     }
+//! }
+//! ```
 use iced_widget::core::font::Font;
 use iced_widget::core::text::highlighter::{self, Format};
 use iced_widget::text_editor::Catalog;
@@ -32,6 +83,7 @@ where
     syntax: &'static parsing::SyntaxReference,
     custom_scopes: Vec<Scope>,
     style: fn(&T, Scope) -> Format<Font>,
+    theme: T,
     caches: Vec<(parsing::ParseState, parsing::ScopeStack)>,
     current_line: usize,
 }
@@ -51,6 +103,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
             .unwrap_or_else(|| SYNTAXES.find_syntax_plain_text());
 
         let style = settings.style.clone();
+        let theme = settings.theme.clone();
         let custom_scopes = settings.custom_scopes.clone();
 
         let parser = parsing::ParseState::new(syntax);
@@ -60,6 +113,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
             syntax,
             custom_scopes,
             style,
+            theme,
             caches: vec![(parser, stack)],
             current_line: 0,
         }
@@ -73,6 +127,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
         self.custom_scopes = new_settings.custom_scopes.clone();
 
         self.style = new_settings.style.clone();
+        self.theme = new_settings.theme.clone();
 
         // Restart the highlighter
         self.change_line(0);
@@ -118,6 +173,8 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
         let custom_scopes = &self.custom_scopes;
 
         let style = &self.style;
+        let theme = &self.theme;
+
         Box::new(
             ScopeRangeIterator {
                 ops,
@@ -139,6 +196,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
                                 custom_scopes.clone(),
                             ),
                             style: style.clone(),
+                            theme: theme.clone(),
                         },
                     ))
                 }
@@ -169,6 +227,9 @@ where
     /// [`default_style`]: Highlight::default_style
     pub style: fn(&T, Scope) -> Format<Font>,
 
+    /// The theme used for highlighting
+    pub theme: T,
+
     /// The extension of the file or the name of the language to highlight.
     ///
     /// The [`Highlighter`] will use the token to automatically determine the grammar to use for highlighting.
@@ -180,11 +241,13 @@ impl<T: Catalog> Settings<T> {
     pub fn new(
         custom_scopes: Vec<Scope>,
         style: fn(&T, Scope) -> Format<Font>,
+        theme: T,
         token: impl Into<String>,
     ) -> Self {
         Self {
             custom_scopes,
             style,
+            theme,
             token: token.into(),
         }
     }
@@ -198,6 +261,7 @@ where
 {
     scope: Scope,
     style: fn(&T, Scope) -> Format<Font>,
+    theme: T,
 }
 
 impl<T: Catalog> Highlight<T> {
@@ -207,8 +271,8 @@ impl<T: Catalog> Highlight<T> {
     ///
     /// [`color`]: iced_widget::core::Color
     /// [`font`]: iced_widget::core::Font
-    pub fn to_format(&self, theme: &T) -> Format<Font> {
-        (self.style)(theme, self.scope.clone())
+    pub fn to_format(&self, _theme: &T) -> Format<Font> {
+        (self.style)(&self.theme, self.scope.clone())
     }
 }
 
