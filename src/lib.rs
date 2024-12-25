@@ -1,6 +1,6 @@
 //! A custom syntax highlighter for iced.
 //!
-//! It uses the colors from your app's Theme, based on the current [`Scope`]
+//! It uses the colors from your app's Theme, based on a styling method (like [`default_style`])
 //!
 //! # Example
 //!
@@ -52,6 +52,8 @@
 //!     }
 //! }
 //! ```
+//!
+//! [`default_style`]: crate::Highlight::default_style
 use iced_widget::core::font::Font;
 use iced_widget::core::text::highlighter::{self, Format};
 use iced_widget::text_editor::Catalog;
@@ -102,7 +104,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
             .find_syntax_by_token(&settings.token)
             .unwrap_or_else(|| SYNTAXES.find_syntax_plain_text());
 
-        let style = settings.style.clone();
+        let style = settings.style;
         let theme = settings.theme.clone();
         let custom_scopes = settings.custom_scopes.clone();
 
@@ -126,7 +128,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
 
         self.custom_scopes = new_settings.custom_scopes.clone();
 
-        self.style = new_settings.style.clone();
+        self.style = new_settings.style;
         self.theme = new_settings.theme.clone();
 
         // Restart the highlighter
@@ -195,7 +197,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
                                 stack.clone(),
                                 custom_scopes.clone(),
                             ),
-                            style: style.clone(),
+                            style: *style,
                             theme: theme.clone(),
                         },
                     ))
@@ -267,10 +269,7 @@ where
 impl<T: Catalog> Highlight<T> {
     /// Returns the [`Format`] of the [`Highlight`].
     ///
-    /// It contains both the [`color`] and the [`font`].
-    ///
-    /// [`color`]: iced_widget::core::Color
-    /// [`font`]: iced_widget::core::Font
+    /// [`Format`]: iced_widget::core::text::highlighter::Format
     pub fn to_format(&self, _theme: &T) -> Format<Font> {
         (self.style)(&self.theme, self.scope.clone())
     }
@@ -467,7 +466,7 @@ impl Scope {
             Self::Parantheses => "meta.brace.round, punctuation.definition.parameters.begin, punctuation.definition.parameters.end",
             Self::Braces => "meta.brace.curly",
             Self::Other => "",
-            Self::Custom {scope_string,..} => &scope_string
+            Self::Custom {scope_string,..} => scope_string
         }
     }
 
@@ -475,16 +474,14 @@ impl Scope {
         stack: parsing::ScopeStack,
         custom_scopes: Vec<Self>,
     ) -> Self {
-        let scopes: Vec<Self>;
-
-        if custom_scopes.len() > 0 {
+        let scopes: Vec<Self> = if !custom_scopes.is_empty() {
             let mut hashset: HashSet<Self> =
-                (*Self::ALL).to_vec().into_iter().collect();
+                (*Self::ALL).iter().cloned().collect();
             hashset.extend(custom_scopes);
-            scopes = hashset.into_iter().collect();
+            hashset.into_iter().collect()
         } else {
-            scopes = Self::ALL.to_vec();
-        }
+            Self::ALL.to_vec()
+        };
 
         let selectors: Vec<(Self, highlighting::ScopeSelectors)> = scopes
             .iter()
