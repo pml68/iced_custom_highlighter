@@ -59,15 +59,15 @@ use iced_widget::core::text::highlighter::{self, Format};
 use iced_widget::text_editor::Catalog;
 use iced_widget::Theme;
 
-use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;
+use std::sync::LazyLock;
 use syntect::highlighting;
 use syntect::parsing;
 
-static SYNTAXES: Lazy<parsing::SyntaxSet> =
-    Lazy::new(parsing::SyntaxSet::load_defaults_nonewlines);
+static SYNTAXES: LazyLock<parsing::SyntaxSet> =
+    LazyLock::new(parsing::SyntaxSet::load_defaults_nonewlines);
 
 const LINES_PER_SNAPSHOT: usize = 50;
 
