@@ -6,15 +6,15 @@ use iced_widget::core::text::highlighter::{self, Format};
 use iced_widget::text_editor::Catalog;
 use iced_widget::Theme;
 
-use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;
+use std::sync::LazyLock;
 use syntect::highlighting;
 use syntect::parsing;
 
-static SYNTAXES: Lazy<parsing::SyntaxSet> =
-    Lazy::new(parsing::SyntaxSet::load_defaults_nonewlines);
+static SYNTAXES: LazyLock<parsing::SyntaxSet> =
+    LazyLock::new(parsing::SyntaxSet::load_defaults_nonewlines);
 
 const LINES_PER_SNAPSHOT: usize = 50;
 
@@ -50,7 +50,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
             .find_syntax_by_token(&settings.token)
             .unwrap_or_else(|| SYNTAXES.find_syntax_plain_text());
 
-        let style = settings.style.clone();
+        let style = settings.style;
         let custom_scopes = settings.custom_scopes.clone();
 
         let parser = parsing::ParseState::new(syntax);
@@ -72,7 +72,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
 
         self.custom_scopes = new_settings.custom_scopes.clone();
 
-        self.style = new_settings.style.clone();
+        self.style = new_settings.style;
 
         // Restart the highlighter
         self.change_line(0);
@@ -138,7 +138,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
                                 stack.clone(),
                                 custom_scopes.clone(),
                             ),
-                            style: style.clone(),
+                            style: *style,
                         },
                     ))
                 }
@@ -403,7 +403,7 @@ impl Scope {
             Self::Parantheses => "meta.brace.round, punctuation.definition.parameters.begin, punctuation.definition.parameters.end",
             Self::Braces => "meta.brace.curly",
             Self::Other => "",
-            Self::Custom {scope_string,..} => &scope_string
+            Self::Custom {scope_string,..} => scope_string
         }
     }
 
@@ -411,16 +411,14 @@ impl Scope {
         stack: parsing::ScopeStack,
         custom_scopes: Vec<Self>,
     ) -> Self {
-        let scopes: Vec<Self>;
-
-        if custom_scopes.len() > 0 {
+        let scopes = if !custom_scopes.is_empty() {
             let mut hashset: HashSet<Self> =
-                (*Self::ALL).to_vec().into_iter().collect();
+                (*Self::ALL).iter().cloned().collect();
             hashset.extend(custom_scopes);
-            scopes = hashset.into_iter().collect();
+            hashset.into_iter().collect()
         } else {
-            scopes = Self::ALL.to_vec();
-        }
+            Self::ALL.to_vec()
+        };
 
         let selectors: Vec<(Self, highlighting::ScopeSelectors)> = scopes
             .iter()
