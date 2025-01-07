@@ -31,7 +31,7 @@ where
 {
     syntax: &'static parsing::SyntaxReference,
     custom_scopes: Vec<Scope>,
-    style: fn(&T, Scope) -> Format<Font>,
+    style: fn(&T, &Scope) -> Format<Font>,
     caches: Vec<(parsing::ParseState, parsing::ScopeStack)>,
     current_line: usize,
 }
@@ -135,7 +135,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
                         range,
                         Highlight {
                             scope: Scope::from_scopestack(
-                                stack.clone(),
+                                stack,
                                 custom_scopes.clone(),
                             ),
                             style: *style,
@@ -167,7 +167,7 @@ where
     /// It dictates how text matching a certain scope will be highlighted.
     ///
     /// [`default_style`]: Highlight::default_style
-    pub style: fn(&T, Scope) -> Format<Font>,
+    pub style: fn(&T, &Scope) -> Format<Font>,
 
     /// The extension of the file or the name of the language to highlight.
     ///
@@ -179,7 +179,7 @@ impl<T: Catalog> Settings<T> {
     /// Creates a new [`Settings`] struct with the given values.
     pub fn new(
         custom_scopes: Vec<Scope>,
-        style: fn(&T, Scope) -> Format<Font>,
+        style: fn(&T, &Scope) -> Format<Font>,
         token: impl Into<String>,
     ) -> Self {
         Self {
@@ -197,24 +197,21 @@ where
     T: Catalog,
 {
     scope: Scope,
-    style: fn(&T, Scope) -> Format<Font>,
+    style: fn(&T, &Scope) -> Format<Font>,
 }
 
 impl<T: Catalog> Highlight<T> {
     /// Returns the [`Format`] of the [`Highlight`].
     ///
-    /// It contains both the [`color`] and the [`font`].
-    ///
-    /// [`color`]: iced_widget::core::Color
-    /// [`font`]: iced_widget::core::Font
+    /// [`Format`]: iced_widget::core::text::highlighter::Format
     pub fn to_format(&self, theme: &T) -> Format<Font> {
-        (self.style)(theme, self.scope.clone())
+        (self.style)(theme, &self.scope)
     }
 }
 
 impl Highlight<Theme> {
     /// The defalt styling function of a [`Highlight`].
-    pub fn default_style(theme: &Theme, scope: Scope) -> Format<Font> {
+    pub fn default_style(theme: &Theme, scope: &Scope) -> Format<Font> {
         let color = match scope {
             Scope::Comment | Scope::TagStart => {
                 theme.extended_palette().background.weak.color
@@ -223,25 +220,27 @@ impl Highlight<Theme> {
                 theme.extended_palette().primary.base.color
             }
             Scope::EscapeSequence
+            | Scope::Exception
             | Scope::SupportConstruct
             | Scope::Continuation => theme.extended_palette().danger.base.color,
             Scope::Number => theme.extended_palette().secondary.weak.color,
             Scope::Variable
             | Scope::VariableStart
             | Scope::TagName
+            | Scope::Import
             | Scope::Brackets => theme.extended_palette().primary.weak.color,
-            Scope::VariableFunction | Scope::FunctionName => {
-                theme.extended_palette().success.base.color
-            }
-            Scope::Keyword | Scope::KeywordOperator | Scope::Operator => {
-                theme.extended_palette().background.strong.color
-            }
-            Scope::KeywordOther => theme.extended_palette().danger.strong.color,
+            Scope::Keyword
+            | Scope::KeywordOperator
+            | Scope::Operator
+            | Scope::Parantheses
+            | Scope::Braces => theme.extended_palette().background.strong.color,
             Scope::Storage
             | Scope::StorageModifier
             | Scope::StorageType
             | Scope::Class
             | Scope::LibraryClass
+            | Scope::VariableFunction
+            | Scope::FunctionName
             | Scope::LibraryFunction => {
                 theme.extended_palette().success.base.color
             }
@@ -250,11 +249,8 @@ impl Highlight<Theme> {
                 theme.extended_palette().danger.base.color
             }
             Scope::Invalid => theme.extended_palette().danger.weak.color,
-            Scope::Special => theme.extended_palette().danger.strong.color,
-            Scope::Import => theme.extended_palette().primary.weak.color,
-            Scope::Exception => theme.extended_palette().danger.base.color,
-            Scope::Parantheses | Scope::Braces => {
-                theme.extended_palette().background.strong.color
+            Scope::Special | Scope::KeywordOther => {
+                theme.extended_palette().danger.strong.color
             }
             Scope::Other | Scope::Custom { .. } => {
                 theme.extended_palette().primary.strong.color
@@ -408,16 +404,16 @@ impl Scope {
     }
 
     fn from_scopestack(
-        stack: parsing::ScopeStack,
+        stack: &parsing::ScopeStack,
         custom_scopes: Vec<Self>,
     ) -> Self {
-        let scopes = if !custom_scopes.is_empty() {
+        let scopes: Vec<Self> = if custom_scopes.is_empty() {
+            Self::ALL.to_vec()
+        } else {
             let mut hashset: HashSet<Self> =
                 (*Self::ALL).iter().cloned().collect();
             hashset.extend(custom_scopes);
             hashset.into_iter().collect()
-        } else {
-            Self::ALL.to_vec()
         };
 
         let selectors: Vec<(Self, highlighting::ScopeSelectors)> = scopes
