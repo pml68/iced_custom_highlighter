@@ -6,7 +6,6 @@ use iced_widget::core::text::highlighter::{self, Format};
 use iced_widget::text_editor::Catalog;
 use iced_widget::Theme;
 
-use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;
 use std::sync::LazyLock;
@@ -134,10 +133,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
                     Some((
                         range,
                         Highlight {
-                            scope: Scope::from_scopestack(
-                                stack,
-                                custom_scopes.clone(),
-                            ),
+                            scope: Scope::from_scopestack(stack, custom_scopes),
                             style: *style,
                         },
                     ))
@@ -211,6 +207,7 @@ impl<T: Catalog> Highlight<T> {
 
 impl Highlight<Theme> {
     /// The defalt styling function of a [`Highlight`].
+    #[must_use]
     pub fn default_style(theme: &Theme, scope: &Scope) -> Format<Font> {
         let color = match scope {
             Scope::Comment | Scope::TagStart => {
@@ -362,6 +359,7 @@ impl Scope {
     }
 
     /// Retuns the scope string of the [`Scope`].
+    #[must_use]
     pub fn scope_str(&self) -> &str {
         match self {
             Self::Comment => "comment, meta.documentation",
@@ -405,15 +403,14 @@ impl Scope {
 
     fn from_scopestack(
         stack: &parsing::ScopeStack,
-        custom_scopes: Vec<Self>,
+        custom_scopes: &[Self],
     ) -> Self {
         let scopes: Vec<Self> = if custom_scopes.is_empty() {
             Self::ALL.to_vec()
         } else {
-            let mut hashset: HashSet<Self> =
-                (*Self::ALL).iter().cloned().collect();
-            hashset.extend(custom_scopes);
-            hashset.into_iter().collect()
+            let mut all = Self::ALL.to_vec();
+            all.extend_from_slice(custom_scopes);
+            all
         };
 
         let selectors: Vec<(Self, highlighting::ScopeSelectors)> = scopes
