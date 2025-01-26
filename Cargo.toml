@@ -4,7 +4,7 @@ description = "A custom highlighter for `iced`'s TextEditor widget that uses you
 authors = ["pml68 <contact@pml68.dev>"]
 version = "0.1.0"
 edition = "2021"
-license = "GPL-3.0-or-later"
+license = "MIT"
 repository = "https://github.com/pml68/iced_custom_highlighter"
 categories = ["gui"]
 keywords = ["gui", "ui", "graphics", "interface", "widgets"]
@@ -12,7 +12,7 @@ rust-version = "1.80"
 
 [dependencies]
 iced_widget = "0.13.4"
-syntect = { version = "5.1", default-features = false, features = ["default-syntaxes", "regex-onig"] }
+syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "regex-onig"] }
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
