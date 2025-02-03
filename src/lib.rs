@@ -272,7 +272,7 @@ impl<T: Catalog> Highlight<T> {
 }
 
 impl Highlight<Theme> {
-    /// The defalt styling function of a [`Highlight`].
+    /// The default styling function of a [`Highlight`].
     #[must_use]
     pub fn default_style(theme: &Theme, scope: &Scope) -> Format<Font> {
         let color = match scope {
