@@ -277,26 +277,34 @@ impl Highlight<Theme> {
     pub fn default_style(theme: &Theme, scope: &Scope) -> Format<Font> {
         let color = match scope {
             Scope::Comment | Scope::TagStart => {
-                theme.extended_palette().background.weak.color
+                Some(theme.extended_palette().background.weak.color)
             }
             Scope::String | Scope::RegExp | Scope::QuotedString => {
-                theme.extended_palette().primary.base.color
+                Some(theme.extended_palette().primary.base.color)
             }
             Scope::EscapeSequence
             | Scope::Exception
             | Scope::SupportConstruct
-            | Scope::Continuation => theme.extended_palette().danger.base.color,
-            Scope::Number => theme.extended_palette().secondary.weak.color,
+            | Scope::Continuation => {
+                Some(theme.extended_palette().danger.base.color)
+            }
+            Scope::Number => {
+                Some(theme.extended_palette().secondary.weak.color)
+            }
             Scope::Variable
             | Scope::VariableStart
             | Scope::TagName
             | Scope::Import
-            | Scope::Brackets => theme.extended_palette().primary.weak.color,
+            | Scope::Brackets => {
+                Some(theme.extended_palette().primary.weak.color)
+            }
             Scope::Keyword
             | Scope::KeywordOperator
             | Scope::Operator
             | Scope::Parantheses
-            | Scope::Braces => theme.extended_palette().background.strong.color,
+            | Scope::Braces => {
+                Some(theme.extended_palette().background.strong.color)
+            }
             Scope::Storage
             | Scope::StorageModifier
             | Scope::StorageType
@@ -305,25 +313,20 @@ impl Highlight<Theme> {
             | Scope::VariableFunction
             | Scope::FunctionName
             | Scope::LibraryFunction => {
-                theme.extended_palette().success.base.color
+                Some(theme.extended_palette().success.base.color)
             }
-            Scope::QuotedSingle => theme.palette().text,
+            Scope::QuotedSingle => Some(theme.palette().text),
             Scope::BuiltinConstant | Scope::UserDefinedConstant => {
-                theme.extended_palette().danger.base.color
+                Some(theme.extended_palette().danger.base.color)
             }
-            Scope::Invalid => theme.extended_palette().danger.weak.color,
+            Scope::Invalid => Some(theme.extended_palette().danger.weak.color),
             Scope::Special | Scope::KeywordOther => {
-                theme.extended_palette().danger.strong.color
+                Some(theme.extended_palette().danger.strong.color)
             }
-            Scope::Other | Scope::Custom { .. } => {
-                theme.extended_palette().primary.strong.color
-            }
+            Scope::Other | Scope::Custom { .. } => None,
         };
 
-        Format {
-            color: Some(color),
-            font: None,
-        }
+        Format { color, font: None }
     }
 }
 
