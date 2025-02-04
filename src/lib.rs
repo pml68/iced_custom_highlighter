@@ -1,10 +1,9 @@
 //! A custom syntax highlighter for iced.
 //!
 //! It uses the colors from your app's Theme, based on the current [`Scope`]
-use iced_widget::core::font::Font;
-use iced_widget::core::text::highlighter::{self, Format};
-use iced_widget::text_editor::Catalog;
-use iced_widget::Theme;
+use iced_core::font::Font;
+use iced_core::text::highlighter::{self, Format};
+use iced_core::Theme;
 
 use std::ops::Range;
 use std::str::FromStr;
@@ -26,7 +25,7 @@ type ScopeSelectorsResult = core::result::Result<
 #[derive(Debug)]
 pub struct Highlighter<T = Theme>
 where
-    T: Catalog + 'static + Clone + PartialEq,
+    T: 'static + Clone + PartialEq,
 {
     syntax: &'static parsing::SyntaxReference,
     custom_scopes: Vec<Scope>,
@@ -35,7 +34,7 @@ where
     current_line: usize,
 }
 
-impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
+impl<T: 'static + Clone + PartialEq> highlighter::Highlighter
     for Highlighter<T>
 {
     type Settings = Settings<T>;
@@ -149,10 +148,7 @@ impl<T: Catalog + 'static + Clone + PartialEq> highlighter::Highlighter
 
 /// The settings of a [`Highlighter`].
 #[derive(Debug, Clone, PartialEq)]
-pub struct Settings<T>
-where
-    T: Catalog,
-{
+pub struct Settings<T> {
     /// Custom scopes used for parsing the code.
     ///
     /// It extends [`Scope::ALL`].
@@ -171,7 +167,7 @@ where
     pub token: String,
 }
 
-impl<T: Catalog> Settings<T> {
+impl<T> Settings<T> {
     /// Creates a new [`Settings`] struct with the given values.
     pub fn new(
         custom_scopes: Vec<Scope>,
@@ -188,15 +184,12 @@ impl<T: Catalog> Settings<T> {
 
 /// A highlight produced by a [`Highlighter`].
 #[derive(Debug)]
-pub struct Highlight<T>
-where
-    T: Catalog,
-{
+pub struct Highlight<T> {
     scope: Scope,
     style: fn(&T, &Scope) -> Format<Font>,
 }
 
-impl<T: Catalog> Highlight<T> {
+impl<T> Highlight<T> {
     /// Returns the [`Format`] of the [`Highlight`].
     ///
     /// [`Format`]: iced_widget::core::text::highlighter::Format
