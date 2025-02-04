@@ -11,7 +11,7 @@ keywords = ["gui", "ui", "graphics", "interface", "widgets"]
 rust-version = "1.80"
 
 [dependencies]
-iced_widget = "0.13.4"
+iced_core = "0.13.2"
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "regex-onig"] }
 
 [package.metadata.docs.rs]
