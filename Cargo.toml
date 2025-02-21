@@ -11,8 +11,11 @@ keywords = ["gui", "ui", "graphics", "interface", "widgets"]
 rust-version = "1.80"
 
 [dependencies]
-iced_core = "0.13.2"
 syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "regex-onig"] }
+
+[dependencies.iced_core]
+git = "https://github.com/iced-rs/iced"
+rev = "97f1db3783dca5a4f60a9f89668613de4dfe9edd"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
