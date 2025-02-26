@@ -117,7 +117,7 @@ checksum = "151665d9be52f9bb40fc7966565d39666f2d1e69233571b71b87791c7e0528b3"
 [[package]]
 name = "iced_core"
 version = "0.14.0-dev"
-source = "git+https://github.com/iced-rs/iced?rev=97f1db3783dca5a4f60a9f89668613de4dfe9edd#97f1db3783dca5a4f60a9f89668613de4dfe9edd"
+source = "git+https://github.com/pml68/iced?rev=d49a70eaea0803b9a4843b37e870f44b652ed6df#d49a70eaea0803b9a4843b37e870f44b652ed6df"
 dependencies = [
  "bitflags 2.8.0",
  "bytes",
