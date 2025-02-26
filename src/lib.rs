@@ -34,7 +34,7 @@
 //!     )
 //!     .push(pick_list(
 //!         Theme::ALL,
-//!         Some(state.theme.clone()),
+//!         Some(state.theme),
 //!         Message::ChangeTheme,
 //!     ))
 //!     .into()
