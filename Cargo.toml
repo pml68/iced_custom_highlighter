@@ -12,7 +12,8 @@ rust-version = "1.80"
 
 [dependencies]
 iced_core = "0.13.2"
-syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "regex-onig"] }
+syntect = { version = "5.2", default-features = false, features = ["regex-onig"] }
+two-face = "0.4.3"
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
