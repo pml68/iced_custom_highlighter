@@ -4,6 +4,8 @@ A custom syntax highlighter for iced.
 
 It uses the colors from your app's Theme, based on a styling method (like `default_style`)
 
+[`two-face`](https://github.com/CosmicHorrorDev/two-face) is used for providing extra syntaxes. [More info](https://github.com/CosmicHorrorDev/two-face?tab=readme-ov-file#syntaxes)
+
 # Example
 
 ```rust
