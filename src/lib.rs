@@ -79,7 +79,7 @@ where
     T: 'static + Clone + PartialEq,
 {
     syntax: &'static parsing::SyntaxReference,
-    custom_scopes: Vec<Scope>,
+    custom_scopes: Box<[Scope]>,
     style: fn(&T, &Scope) -> Format<Font>,
     caches: Vec<(parsing::ParseState, parsing::ScopeStack)>,
     current_line: usize,
@@ -99,8 +99,8 @@ impl<T: 'static + Clone + PartialEq> highlighter::Highlighter
             .find_syntax_by_token(&settings.token)
             .unwrap_or_else(|| SYNTAXES.find_syntax_plain_text());
 
-        let style = settings.style;
         let custom_scopes = settings.custom_scopes.clone();
+        let style = settings.style;
 
         let parser = parsing::ParseState::new(syntax);
         let stack = parsing::ScopeStack::new();
@@ -164,36 +164,117 @@ impl<T: 'static + Clone + PartialEq> highlighter::Highlighter
 
         let ops = parser.parse_line(line, &SYNTAXES).unwrap_or_default();
 
-        let custom_scopes = &self.custom_scopes;
-
-        let style = &self.style;
-        Box::new(
-            ScopeRangeIterator {
-                ops,
-                line_length: line.len(),
-                index: 0,
-                last_str_index: 0,
-            }
-            .filter_map(move |(range, scope)| {
-                let _ = stack.apply(&scope);
-
-                if range.is_empty() {
-                    None
-                } else {
-                    Some((
-                        range,
-                        Highlight {
-                            scope: Scope::from_scopestack(stack, custom_scopes),
-                            style: *style,
-                        },
-                    ))
-                }
-            }),
-        )
+        Box::new(scope_iterator(
+            ops,
+            line,
+            stack,
+            &self.custom_scopes,
+            self.style,
+        ))
     }
 
     fn current_line(&self) -> usize {
         self.current_line
+    }
+}
+
+fn scope_iterator<'a, T: PartialEq + Clone + 'static>(
+    ops: Vec<(usize, parsing::ScopeStackOp)>,
+    line: &str,
+    stack: &'a mut parsing::ScopeStack,
+    custom_scopes: &'a [Scope],
+    style: fn(&T, &Scope) -> Format<Font>,
+) -> impl Iterator<Item = (Range<usize>, Highlight<T>)> + 'a {
+    ScopeRangeIterator {
+        ops,
+        line_length: line.len(),
+        index: 0,
+        last_str_index: 0,
+    }
+    .filter_map(move |(range, scope)| {
+        let _ = stack.apply(&scope);
+
+        if range.is_empty() {
+            None
+        } else {
+            Some((
+                range,
+                Highlight {
+                    scope: Scope::from_scopestack(stack, custom_scopes),
+                    style,
+                },
+            ))
+        }
+    })
+}
+
+/// A streaming syntax highlighter.
+///
+/// It can efficiently highlight an immutable stream of tokens.
+#[derive(Debug)]
+pub struct Stream<T: PartialEq + Clone + 'static> {
+    syntax: &'static parsing::SyntaxReference,
+    custom_scopes: Box<[Scope]>,
+    style: fn(&T, &Scope) -> Format<Font>,
+    commit: (parsing::ParseState, parsing::ScopeStack),
+    state: parsing::ParseState,
+    stack: parsing::ScopeStack,
+}
+
+impl<T> Stream<T>
+where
+    T: PartialEq + Clone + 'static,
+{
+    /// Creates a new [`Stream`] highlighter.
+    pub fn new(settings: &Settings<T>) -> Self {
+        let syntax = SYNTAXES
+            .find_syntax_by_token(&settings.token)
+            .unwrap_or_else(|| SYNTAXES.find_syntax_plain_text());
+
+        let custom_scopes = settings.custom_scopes.clone();
+        let style = settings.style;
+
+        let state = parsing::ParseState::new(syntax);
+        let stack = parsing::ScopeStack::new();
+
+        Self {
+            syntax,
+            custom_scopes,
+            style,
+            commit: (state.clone(), stack.clone()),
+            state,
+            stack,
+        }
+    }
+
+    /// Highlights the given line from the last commit.
+    pub fn highlight_line(
+        &mut self,
+        line: &str,
+    ) -> impl Iterator<Item = (Range<usize>, Highlight<T>)> + '_ {
+        self.state = self.commit.0.clone();
+        self.stack = self.commit.1.clone();
+
+        let ops = self.state.parse_line(line, &SYNTAXES).unwrap_or_default();
+        scope_iterator(
+            ops,
+            line,
+            &mut self.stack,
+            &self.custom_scopes,
+            self.style,
+        )
+    }
+
+    /// Commits the last highlighted line.
+    pub fn commit(&mut self) {
+        self.commit = (self.state.clone(), self.stack.clone());
+    }
+
+    /// Resets the [`Stream`] highlighter.
+    pub fn reset(&mut self) {
+        self.state = parsing::ParseState::new(self.syntax);
+        self.stack = parsing::ScopeStack::new();
+        self.commit = (self.state.clone(), self.stack.clone());
     }
 }
 
@@ -203,7 +284,7 @@ pub struct Settings<T> {
     /// Custom scopes used for parsing the code.
     ///
     /// It extends [`Scope::ALL`].
-    pub custom_scopes: Vec<Scope>,
+    pub custom_scopes: Box<[Scope]>,
 
     /// The styling method of the [`Highlighter`].
     ///
@@ -221,12 +302,12 @@ pub struct Settings<T> {
 impl<T> Settings<T> {
     /// Creates a new [`Settings`] struct with the given values.
     pub fn new(
-        custom_scopes: Vec<Scope>,
+        custom_scopes: impl Into<Box<[Scope]>>,
         style: fn(&T, &Scope) -> Format<Font>,
         token: impl Into<String>,
     ) -> Self {
         Self {
-            custom_scopes,
+            custom_scopes: custom_scopes.into(),
             style,
             token: token.into(),
         }
