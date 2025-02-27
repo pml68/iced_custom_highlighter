@@ -26,7 +26,6 @@
 //!     .push(
 //!         text_editor(&state.content)
 //!             .placeholder("Type something here...")
-//!             .rehighlight_on_redraw(true)
 //!             .highlight_with::<Highlighter>(
 //!                 Settings::new(vec![], Highlight::default_style, "rs"),
 //!                 Highlight::to_format,
