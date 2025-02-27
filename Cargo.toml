@@ -11,7 +11,8 @@ keywords = ["gui", "ui", "graphics", "interface", "widgets"]
 rust-version = "1.80"
 
 [dependencies]
-syntect = { version = "5.2", default-features = false, features = ["default-syntaxes", "regex-onig"] }
+syntect = { version = "5.2", default-features = false, features = ["regex-onig"] }
+two-face = "0.4.3"
 
 [dependencies.iced_core]
 git = "https://github.com/pml68/iced"

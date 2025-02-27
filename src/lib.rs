@@ -65,7 +65,7 @@ use syntect::highlighting;
 use syntect::parsing;
 
 static SYNTAXES: LazyLock<parsing::SyntaxSet> =
-    LazyLock::new(parsing::SyntaxSet::load_defaults_nonewlines);
+    LazyLock::new(two_face::syntax::extra_no_newlines);
 
 const LINES_PER_SNAPSHOT: usize = 50;
 
